@@ -42,7 +42,7 @@ namespace BrandUp.Extensions.Migrations.Tests
         {
             var locator = scope.ServiceProvider.GetService<IMigrationLocator>();
             var migrations = locator.GetMigrations(new Version("0.0.0"));
-            await store.ApplyMigration(migrations.OrderBy(it => it.Version).First());
+            await store.ApplyMigrationAsync(migrations.OrderBy(it => it.Version).First());
 
             var executor = scope.ServiceProvider.GetService<MigrationExecutor>();
 
@@ -79,13 +79,13 @@ namespace BrandUp.Extensions.Migrations.Tests
         {
             private Dictionary<Version, IMigrationVersion> versions = new Dictionary<Version, IMigrationVersion>();
 
-            public Task ApplyMigration(IMigrationVersion migrationVersion)
+            public Task ApplyMigrationAsync(IMigrationVersion migrationVersion)
             {
                 versions.Add(migrationVersion.Version, migrationVersion);
 
                 return Task.CompletedTask;
             }
-            public Task CancelMigration(IMigrationVersion migrationVersion)
+            public Task CancelMigrationAsync(IMigrationVersion migrationVersion)
             {
                 if (!versions.Remove(migrationVersion.Version))
                     throw new Exception();
