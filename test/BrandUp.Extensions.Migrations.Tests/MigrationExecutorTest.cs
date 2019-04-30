@@ -21,6 +21,7 @@ namespace BrandUp.Extensions.Migrations.Tests
             services.AddLogging();
             services.AddMigrations(typeof(MigrationExecutorTest).Assembly);
             services.AddSingleton<IMigrationStore>(store);
+            services.AddScoped<Migrations.TestService>();
 
             provider = services.BuildServiceProvider();
             scope = provider.CreateScope();

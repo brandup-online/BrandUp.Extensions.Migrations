@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.Logging;
+﻿using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -37,7 +38,7 @@ namespace BrandUp.Extensions.Migrations
                 return result;
             }
 
-            var migrations = new SortedDictionary<MigrationDefinition, IMigration>();
+            var migrations = new SortedDictionary<MigrationDefinition, MigrationWrapper>();
             foreach (var migrationDefinition in migrationDefinitions)
             {
                 var migration = CreateMigrationInstance(migrationDefinition);
@@ -46,11 +47,11 @@ namespace BrandUp.Extensions.Migrations
 
             foreach (var kv in migrations)
             {
-                await kv.Value.UpAsync(cancellationToken);
-                await migrationStore.ApplyMigrationAsync(kv.Key);
-
-                if (kv.Value is IDisposable d)
-                    d.Dispose();
+                using (kv.Value)
+                {
+                    await kv.Value.Migration.UpAsync(cancellationToken);
+                    await migrationStore.ApplyMigrationAsync(kv.Key);
+                }
 
                 result.Add(kv.Key);
             }
@@ -66,7 +67,7 @@ namespace BrandUp.Extensions.Migrations
             foreach (var migrationDefinition in migrationLocator.GetMigrations(new Version(0, 0, 0)))
                 migrationDefinitions.Add(migrationDefinition.Version, migrationDefinition);
 
-            var migrations = new SortedDictionary<MigrationDefinition, IMigration>();
+            var migrations = new SortedDictionary<MigrationDefinition, MigrationWrapper>();
             foreach (var appliedMigration in appliedMigrations)
             {
                 if (!migrationDefinitions.TryGetValue(appliedMigration.Version, out MigrationDefinition migrationDefinition))
@@ -79,11 +80,11 @@ namespace BrandUp.Extensions.Migrations
             var result = new List<IMigrationVersion>();
             foreach (var kv in migrations)
             {
-                await kv.Value.DownAsync(cancellationToken);
-                await migrationStore.CancelMigrationAsync(kv.Key);
-
-                if (kv.Value is IDisposable d)
-                    d.Dispose();
+                using (kv.Value)
+                {
+                    await kv.Value.Migration.DownAsync(cancellationToken);
+                    await migrationStore.CancelMigrationAsync(kv.Key);
+                }
 
                 result.Add(kv.Key);
             }
@@ -91,23 +92,44 @@ namespace BrandUp.Extensions.Migrations
             return result;
         }
 
-        private IMigration CreateMigrationInstance(MigrationDefinition migrationDefinition)
+        private MigrationWrapper CreateMigrationInstance(MigrationDefinition migrationDefinition)
         {
             var migrationType = migrationDefinition.MigrationType;
             var migrationConstructor = migrationType.GetConstructors(BindingFlags.Instance | BindingFlags.Public).SingleOrDefault();
             if (migrationConstructor == null)
                 throw new InvalidOperationException();
 
+            var scope = serviceProvider.CreateScope();
             var constructorParamsInfo = migrationConstructor.GetParameters();
             var constratorParams = new object[constructorParamsInfo.Length];
             var i = 0;
             foreach (var p in constructorParamsInfo)
             {
-                constratorParams[i] = serviceProvider.GetService(p.ParameterType);
+                constratorParams[i] = scope.ServiceProvider.GetService(p.ParameterType);
                 i++;
             }
 
-            return (IMigration)migrationConstructor.Invoke(constratorParams);
+            var migration = (IMigration)migrationConstructor.Invoke(constratorParams);
+
+            return new MigrationWrapper
+            {
+                Scope = scope,
+                Migration = migration
+            };
+        }
+
+        private class MigrationWrapper : IDisposable
+        {
+            public IMigration Migration { get; set; }
+            public IServiceScope Scope { get; set; }
+
+            void IDisposable.Dispose()
+            {
+                if (Migration is IDisposable d)
+                    d.Dispose();
+
+                Scope.Dispose();
+            }
         }
     }
 }
