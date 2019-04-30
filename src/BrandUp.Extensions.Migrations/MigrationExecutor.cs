@@ -47,7 +47,7 @@ namespace BrandUp.Extensions.Migrations
             foreach (var kv in migrations)
             {
                 await kv.Value.UpAsync(cancellationToken);
-                await migrationStore.ApplyMigration(kv.Key);
+                await migrationStore.ApplyMigrationAsync(kv.Key);
 
                 if (kv.Value is IDisposable d)
                     d.Dispose();
@@ -80,7 +80,7 @@ namespace BrandUp.Extensions.Migrations
             foreach (var kv in migrations)
             {
                 await kv.Value.DownAsync(cancellationToken);
-                await migrationStore.CancelMigration(kv.Key);
+                await migrationStore.CancelMigrationAsync(kv.Key);
 
                 if (kv.Value is IDisposable d)
                     d.Dispose();

@@ -7,8 +7,8 @@ namespace BrandUp.Extensions.Migrations
     public interface IMigrationStore
     {
         Task<Version> GetCurrentVersionAsync();
-        Task ApplyMigration(IMigrationVersion migrationVersion);
-        Task CancelMigration(IMigrationVersion migrationVersion);
+        Task ApplyMigrationAsync(IMigrationVersion migrationVersion);
+        Task CancelMigrationAsync(IMigrationVersion migrationVersion);
         Task<IEnumerable<IMigrationVersion>> GetAppliedMigrationsAsync();
     }
 }
