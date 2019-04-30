@@ -44,12 +44,15 @@ namespace BrandUp.Extensions.Migrations
                 migrations.Add(migrationDefinition, migration);
             }
 
-            foreach (var m in migrations)
+            foreach (var kv in migrations)
             {
-                await m.Value.UpAsync(cancellationToken);
-                await migrationStore.ApplyMigration(m.Key);
+                await kv.Value.UpAsync(cancellationToken);
+                await migrationStore.ApplyMigration(kv.Key);
 
-                result.Add(m.Key);
+                if (kv.Value is IDisposable d)
+                    d.Dispose();
+
+                result.Add(kv.Key);
             }
 
             return result;
@@ -74,12 +77,15 @@ namespace BrandUp.Extensions.Migrations
             }
 
             var result = new List<IMigrationVersion>();
-            foreach (var m in migrations)
+            foreach (var kv in migrations)
             {
-                await m.Value.DownAsync(cancellationToken);
-                await migrationStore.CancelMigration(m.Key);
+                await kv.Value.DownAsync(cancellationToken);
+                await migrationStore.CancelMigration(kv.Key);
 
-                result.Add(m.Key);
+                if (kv.Value is IDisposable d)
+                    d.Dispose();
+
+                result.Add(kv.Key);
             }
 
             return result;
