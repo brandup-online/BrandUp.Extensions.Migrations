@@ -31,7 +31,7 @@ namespace BrandUp.Extensions.Migrations
                 currentVersion = new Version(0, 0, 0);
 
             var result = new List<IMigrationVersion>();
-            var migrationDefinitions = migrationLocator.GetMigrations(currentVersion).ToList();
+            var migrationDefinitions = migrationLocator.GetMigrations().ToList();
             if (migrationDefinitions.Count == 0)
             {
                 logger.LogInformation($"Новых миграций не найдено. Текущая версия {currentVersion}.");
@@ -64,7 +64,7 @@ namespace BrandUp.Extensions.Migrations
             var appliedMigrations = await migrationStore.GetAppliedMigrationsAsync();
 
             var migrationDefinitions = new SortedDictionary<Version, MigrationDefinition>();
-            foreach (var migrationDefinition in migrationLocator.GetMigrations(new Version(0, 0, 0)))
+            foreach (var migrationDefinition in migrationLocator.GetMigrations())
                 migrationDefinitions.Add(migrationDefinition.Version, migrationDefinition);
 
             var migrations = new SortedDictionary<MigrationDefinition, MigrationWrapper>();

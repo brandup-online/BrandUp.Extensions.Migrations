@@ -19,7 +19,10 @@ namespace BrandUp.Extensions.Migrations.Tests
 
             var services = new ServiceCollection();
             services.AddLogging();
-            services.AddMigrations(typeof(MigrationExecutorTest).Assembly);
+            services.AddMigrations(options =>
+            {
+
+            });
             services.AddSingleton<IMigrationStore>(store);
             services.AddScoped<Migrations.TestService>();
 
@@ -42,7 +45,7 @@ namespace BrandUp.Extensions.Migrations.Tests
         public async Task UpAsync_Second()
         {
             var locator = scope.ServiceProvider.GetService<IMigrationLocator>();
-            var migrations = locator.GetMigrations(new Version("0.0.0"));
+            var migrations = locator.GetMigrations();
             await store.ApplyMigrationAsync(migrations.OrderBy(it => it.Version).First());
 
             var executor = scope.ServiceProvider.GetService<MigrationExecutor>();

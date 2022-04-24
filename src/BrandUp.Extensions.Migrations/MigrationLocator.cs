@@ -13,11 +13,8 @@ namespace BrandUp.Extensions.Migrations
             this.assembly = assembly ?? throw new ArgumentNullException(nameof(assembly));
         }
 
-        public IEnumerable<MigrationDefinition> GetMigrations(Version after)
+        public IEnumerable<MigrationDefinition> GetMigrations()
         {
-            if (after == null)
-                throw new ArgumentNullException(nameof(after));
-
             var defs = new List<MigrationDefinition>();
             foreach (var type in assembly.GetTypes())
             {
@@ -25,10 +22,7 @@ namespace BrandUp.Extensions.Migrations
                 if (migrationAttribute == null)
                     continue;
 
-                if (migrationAttribute.Version <= after)
-                    continue;
-
-                defs.Add(new MigrationDefinition(migrationAttribute.Version, type, migrationAttribute.Description));
+                defs.Add(new MigrationDefinition(type, migrationAttribute));
             }
             return defs;
         }

@@ -3,7 +3,7 @@ using System.Threading.Tasks;
 
 namespace BrandUp.Extensions.Migrations.Tests.Migrations
 {
-    [Migration("1.0.0", "Migration1")]
+    [Setup("test")]
     public class Migration1 : IMigration
     {
         private readonly TestService service;

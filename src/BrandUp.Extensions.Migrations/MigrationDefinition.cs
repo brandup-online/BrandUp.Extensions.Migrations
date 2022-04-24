@@ -4,16 +4,17 @@ namespace BrandUp.Extensions.Migrations
 {
     public class MigrationDefinition : IMigrationVersion, IComparable<MigrationDefinition>
     {
+        readonly MigrationAttribute attribute;
+
         public Guid Id { get; } = Guid.NewGuid();
         public Version Version { get; }
         public string Description { get; }
         public Type MigrationType { get; }
 
-        public MigrationDefinition(Version version, Type migrationType, string description = null)
+        public MigrationDefinition(Type migrationType, MigrationAttribute migrationAttribute)
         {
-            Version = version ?? throw new ArgumentNullException(nameof(version));
             MigrationType = migrationType ?? throw new ArgumentNullException(nameof(migrationType));
-            Description = description;
+            attribute = migrationAttribute ?? throw new ArgumentNullException(nameof(migrationAttribute));
         }
 
         public override int GetHashCode()
