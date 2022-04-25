@@ -3,8 +3,8 @@ using System.Threading.Tasks;
 
 namespace BrandUp.Extensions.Migrations.Tests.Migrations
 {
-    [Upgrade(After = typeof(Migration1))]
-    public class Migration2 : IMigration
+    [Upgrade(typeof(Migration1))]
+    public class Migration2 : IMigrationHandler
     {
         public Task UpAsync(CancellationToken cancellationToken = default)
         {

@@ -2,10 +2,10 @@
 
 namespace BrandUp.Extensions.Migrations
 {
-    public interface IMigrationVersion
+    public interface IMigrationDefinition
     {
-        Guid Id { get; }
-        Version Version { get; }
+        string Name { get; }
+        Type HandlerType { get; }
         string Description { get; }
     }
 }

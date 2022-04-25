@@ -5,18 +5,11 @@ namespace BrandUp.Extensions.Migrations
     [AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = false)]
     public class UpgradeAttribute : MigrationAttribute
     {
-        public Type After { get; set; }
-        public Version Version { get; }
-        public string Description { get; set; }
+        public Type AfterType { get; }
 
-        public UpgradeAttribute(string version = null)
+        public UpgradeAttribute(Type migrationAfterType)
         {
-            if (version == null)
-                throw new ArgumentNullException(nameof(version));
-
-            Version = Version.Parse(version);
+            AfterType = migrationAfterType ?? throw new ArgumentNullException(nameof(migrationAfterType));
         }
     }
-
-    public abstract class MigrationAttribute : Attribute { }
 }

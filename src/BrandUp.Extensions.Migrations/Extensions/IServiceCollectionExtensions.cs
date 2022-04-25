@@ -10,7 +10,7 @@ namespace Microsoft.Extensions.DependencyInjection
             services.AddOptions<MigrationOptions>().Configure(setup);
 
             services.AddTransient<MigrationExecutor>();
-            //services.AddSingleton<IMigrationLocator>(new MigrationLocator(assembly));
+            services.AddSingleton<IMigrationLocator, MigrationLocator>();
 
             return services;
         }

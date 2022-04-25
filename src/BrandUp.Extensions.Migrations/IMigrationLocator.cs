@@ -1,9 +1,10 @@
 ﻿using System.Collections.Generic;
+using System.Reflection;
 
 namespace BrandUp.Extensions.Migrations
 {
     public interface IMigrationLocator
     {
-        IEnumerable<MigrationDefinition> GetMigrations();
+        IEnumerable<MigrationDefinition> FindMigrations(Assembly assembly);
     }
 }

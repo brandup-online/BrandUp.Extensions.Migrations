@@ -2,35 +2,40 @@
 
 namespace BrandUp.Extensions.Migrations
 {
-    public class MigrationDefinition : IMigrationVersion, IComparable<MigrationDefinition>
+    public class MigrationDefinition : IMigrationDefinition
     {
+        readonly static Type MigrationHandlerInterface = typeof(IMigrationHandler);
         readonly MigrationAttribute attribute;
 
-        public Guid Id { get; } = Guid.NewGuid();
-        public Version Version { get; }
-        public string Description { get; }
-        public Type MigrationType { get; }
+        public string Name { get; }
+        public string Description => attribute.Description;
+        public Type HandlerType { get; }
+        public Type ParentHandlerType { get; }
+        public bool IsRoot => ParentHandlerType == null;
 
-        public MigrationDefinition(Type migrationType, MigrationAttribute migrationAttribute)
+        public MigrationDefinition(Type handlerType, MigrationAttribute attribute)
         {
-            MigrationType = migrationType ?? throw new ArgumentNullException(nameof(migrationType));
-            attribute = migrationAttribute ?? throw new ArgumentNullException(nameof(migrationAttribute));
+            HandlerType = handlerType ?? throw new ArgumentNullException(nameof(handlerType));
+            this.attribute = attribute ?? throw new ArgumentNullException(nameof(attribute));
+
+            if (attribute is UpgradeAttribute upgradeAttribute)
+                ParentHandlerType = upgradeAttribute.AfterType;
+
+            if (!MigrationHandlerInterface.IsAssignableFrom(handlerType))
+                throw new ArgumentException($"Type {handlerType} is not inherit interface {MigrationHandlerInterface}.");
+
+            Name = handlerType.FullName;
         }
+
+        #region Object members
 
         public override int GetHashCode()
         {
-            return Version.GetHashCode();
+            return HandlerType.GetHashCode();
         }
         public override string ToString()
         {
-            return $"[{Version}] {Description}";
-        }
-
-        #region IComparable members
-
-        public int CompareTo(MigrationDefinition other)
-        {
-            return Version.CompareTo(other.Version);
+            return HandlerType.ToString();
         }
 
         #endregion

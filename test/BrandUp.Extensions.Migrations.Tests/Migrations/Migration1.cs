@@ -3,8 +3,8 @@ using System.Threading.Tasks;
 
 namespace BrandUp.Extensions.Migrations.Tests.Migrations
 {
-    [Setup("test")]
-    public class Migration1 : IMigration
+    [Setup]
+    public class Migration1 : IMigrationHandler
     {
         private readonly TestService service;
 

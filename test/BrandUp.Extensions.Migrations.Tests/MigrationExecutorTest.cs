@@ -1,7 +1,8 @@
+using BrandUp.Extensions.Migrations.Tests.Migrations;
 using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Collections.Generic;
-using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
 
@@ -21,10 +22,10 @@ namespace BrandUp.Extensions.Migrations.Tests
             services.AddLogging();
             services.AddMigrations(options =>
             {
-
+                options.AddAssembly(typeof(Migration1).Assembly);
             });
-            services.AddSingleton<IMigrationStore>(store);
-            services.AddScoped<Migrations.TestService>();
+            services.AddSingleton<IMigrationState>(store);
+            services.AddScoped<TestService>();
 
             provider = services.BuildServiceProvider();
             scope = provider.CreateScope();
@@ -37,72 +38,78 @@ namespace BrandUp.Extensions.Migrations.Tests
 
             var appliedMigrations = await executor.UpAsync();
 
-            Assert.NotEmpty(appliedMigrations);
-            Assert.NotEmpty(await store.GetAppliedMigrationsAsync());
+            Assert.Equal(2, appliedMigrations.Count);
+            Assert.Equal(2, store.Names.Count);
+            Assert.Equal("brandup.extensions.migrations.tests.migrations.migration1", store.Names[0].ToLower());
+            Assert.Equal("brandup.extensions.migrations.tests.migrations.migration2", store.Names[1].ToLower());
         }
 
         [Fact]
         public async Task UpAsync_Second()
         {
-            var locator = scope.ServiceProvider.GetService<IMigrationLocator>();
-            var migrations = locator.GetMigrations();
-            await store.ApplyMigrationAsync(migrations.OrderBy(it => it.Version).First());
-
             var executor = scope.ServiceProvider.GetService<MigrationExecutor>();
 
             var appliedMigrations = await executor.UpAsync();
+            Assert.Equal(2, appliedMigrations.Count);
 
-            Assert.Single(appliedMigrations);
-            Assert.Equal(2, (await store.GetAppliedMigrationsAsync()).Count());
-        }
-
-        [Fact]
-        public async Task DownAsync_Empty()
-        {
-            var executor = scope.ServiceProvider.GetService<MigrationExecutor>();
-
-            var appliedMigrations = await executor.DownAsync();
+            appliedMigrations = await executor.UpAsync();
 
             Assert.Empty(appliedMigrations);
-            Assert.Empty(await store.GetAppliedMigrationsAsync());
+            Assert.Equal(2, store.Names.Count);
         }
 
         [Fact]
-        public async Task DownAsync_NotEmpty()
+        public async Task DownAsync_First()
         {
             var executor = scope.ServiceProvider.GetService<MigrationExecutor>();
             await executor.UpAsync();
 
-            var appliedMigrations = await executor.DownAsync();
+            var downedMigrations = await executor.DownAsync();
 
-            Assert.NotEmpty(appliedMigrations);
-            Assert.Empty(await store.GetAppliedMigrationsAsync());
+            Assert.Equal(2, downedMigrations.Count);
+            Assert.Empty(store.Names);
+            Assert.Equal("brandup.extensions.migrations.tests.migrations.migration2", downedMigrations[0].Name.ToLower());
+            Assert.Equal("brandup.extensions.migrations.tests.migrations.migration1", downedMigrations[1].Name.ToLower());
         }
 
-        private class MemoryMigrationStore : IMigrationStore
+        [Fact]
+        public async Task DownAsync_Second()
         {
-            private Dictionary<Version, IMigrationVersion> versions = new Dictionary<Version, IMigrationVersion>();
+            var executor = scope.ServiceProvider.GetService<MigrationExecutor>();
+            await executor.UpAsync();
+            var downedMigrations = await executor.DownAsync();
+            Assert.Equal(2, downedMigrations.Count);
 
-            public Task ApplyMigrationAsync(IMigrationVersion migrationVersion)
+            downedMigrations = await executor.DownAsync();
+
+            Assert.Empty(downedMigrations);
+            Assert.Empty(store.Names);
+        }
+
+        private class MemoryMigrationStore : IMigrationState
+        {
+            readonly List<string> names = new List<string>();
+
+            public List<string> Names => names;
+
+            public Task<bool> IsAppliedAsync(IMigrationDefinition migrationDefinition, CancellationToken cancellationToken = default)
             {
-                versions.Add(migrationVersion.Version, migrationVersion);
+                return Task.FromResult(names.Contains(migrationDefinition.Name.ToUpper()));
+            }
+
+            public Task SetUpAsync(IMigrationDefinition migrationDefinition, CancellationToken cancellationToken = default)
+            {
+                names.Add(migrationDefinition.Name.ToUpper());
 
                 return Task.CompletedTask;
             }
-            public Task CancelMigrationAsync(IMigrationVersion migrationVersion)
+
+            public Task SetDownAsync(IMigrationDefinition migrationDefinition, CancellationToken cancellationToken = default)
             {
-                if (!versions.Remove(migrationVersion.Version))
-                    throw new Exception();
+                if (!names.Remove(migrationDefinition.Name.ToUpper()))
+                    throw new InvalidOperationException();
 
                 return Task.CompletedTask;
-            }
-            public Task<IEnumerable<IMigrationVersion>> GetAppliedMigrationsAsync()
-            {
-                return Task.FromResult<IEnumerable<IMigrationVersion>>(versions.Values.OrderBy(it => it.Version));
-            }
-            public Task<Version> GetCurrentVersionAsync()
-            {
-                return Task.FromResult(versions.Keys.Max(it => it));
             }
         }
     }

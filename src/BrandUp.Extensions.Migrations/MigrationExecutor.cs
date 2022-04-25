@@ -1,5 +1,6 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -11,125 +12,234 @@ namespace BrandUp.Extensions.Migrations
 {
     public class MigrationExecutor
     {
-        private readonly IMigrationLocator migrationLocator;
-        private readonly IMigrationStore migrationStore;
-        private readonly ILogger<MigrationExecutor> logger;
-        private readonly IServiceProvider serviceProvider;
+        readonly MigrationOptions options;
+        readonly IMigrationLocator migrationLocator;
+        readonly IMigrationState migrationState;
+        readonly ILogger<MigrationExecutor> logger;
+        readonly IServiceProvider serviceProvider;
 
-        public MigrationExecutor(IMigrationLocator migrationLocator, IMigrationStore migrationStore, ILogger<MigrationExecutor> logger, IServiceProvider serviceProvider)
+        public MigrationExecutor(IOptions<MigrationOptions> options, IMigrationLocator migrationLocator, IMigrationState migrationState, ILogger<MigrationExecutor> logger, IServiceProvider serviceProvider)
         {
+            this.options = options?.Value ?? throw new ArgumentNullException(nameof(options));
             this.migrationLocator = migrationLocator ?? throw new ArgumentNullException(nameof(migrationLocator));
-            this.migrationStore = migrationStore ?? throw new ArgumentNullException(nameof(migrationStore));
+            this.migrationState = migrationState ?? throw new ArgumentNullException(nameof(migrationState));
             this.logger = logger ?? throw new ArgumentNullException(nameof(logger));
             this.serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
         }
 
-        public async Task<List<IMigrationVersion>> UpAsync(CancellationToken cancellationToken = default)
+        public async Task<List<IMigrationDefinition>> UpAsync(CancellationToken cancellationToken = default)
         {
-            var currentVersion = await migrationStore.GetCurrentVersionAsync();
-            if (currentVersion == null)
-                currentVersion = new Version(0, 0, 0);
-
-            var result = new List<IMigrationVersion>();
-            var migrationDefinitions = migrationLocator.GetMigrations().ToList();
-            if (migrationDefinitions.Count == 0)
+            var structure = BuildStructure();
+            if (structure == null)
             {
-                logger.LogInformation($"Новых миграций не найдено. Текущая версия {currentVersion}.");
-                return result;
+                logger.LogInformation($"Not found new migrations.");
+                return new List<IMigrationDefinition>();
             }
 
-            var migrations = new SortedDictionary<MigrationDefinition, MigrationWrapper>();
-            foreach (var migrationDefinition in migrationDefinitions)
+            using var scope = serviceProvider.CreateScope();
+
+            structure.Build(scope.ServiceProvider);
+
+            return await structure.UpAsync(migrationState, cancellationToken);
+        }
+        public async Task<List<IMigrationDefinition>> DownAsync(CancellationToken cancellationToken = default)
+        {
+            var structure = BuildStructure();
+            if (structure == null)
             {
-                var migration = CreateMigrationInstance(migrationDefinition);
-                migrations.Add(migrationDefinition, migration);
+                logger.LogInformation($"Not found new migrations.");
+                return new List<IMigrationDefinition>();
             }
 
-            foreach (var kv in migrations)
-            {
-                using (kv.Value)
-                {
-                    await kv.Value.Migration.UpAsync(cancellationToken);
-                    await migrationStore.ApplyMigrationAsync(kv.Key);
-                }
+            using var scope = serviceProvider.CreateScope();
 
-                result.Add(kv.Key);
-            }
+            structure.Build(scope.ServiceProvider);
 
-            return result;
+            return await structure.DownAsync(migrationState, cancellationToken);
         }
 
-        public async Task<List<IMigrationVersion>> DownAsync(CancellationToken cancellationToken = default)
+        private MigrationStructure BuildStructure()
         {
-            var appliedMigrations = await migrationStore.GetAppliedMigrationsAsync();
+            var migrationDefinitions = new HashSet<MigrationDefinition>();
+            var assemblies = new List<Assembly>();
+            foreach (var assembly in options.Assemblies)
+                FindMigrations(migrationDefinitions, assembly, assemblies);
 
-            var migrationDefinitions = new SortedDictionary<Version, MigrationDefinition>();
-            foreach (var migrationDefinition in migrationLocator.GetMigrations())
-                migrationDefinitions.Add(migrationDefinition.Version, migrationDefinition);
+            if (migrationDefinitions.Count == 0)
+                return null;
 
-            var migrations = new SortedDictionary<MigrationDefinition, MigrationWrapper>();
-            foreach (var appliedMigration in appliedMigrations)
+            return new MigrationStructure(migrationDefinitions);
+        }
+        private void FindMigrations(HashSet<MigrationDefinition> migrationDefinitions, Assembly assembly, List<Assembly> assemblies)
+        {
+            if (assemblies.Contains(assembly))
+                return;
+            assemblies.Add(assembly);
+
+            foreach (var m in migrationLocator.FindMigrations(assembly))
             {
-                if (!migrationDefinitions.TryGetValue(appliedMigration.Version, out MigrationDefinition migrationDefinition))
+                if (migrationDefinitions.Contains(m))
+                    continue;
+
+                migrationDefinitions.Add(m);
+
+                if (!m.IsRoot && !assemblies.Contains(m.ParentHandlerType.Assembly))
+                    FindMigrations(migrationDefinitions, m.ParentHandlerType.Assembly, assemblies);
+            }
+        }
+    }
+
+    class MigrationStructure
+    {
+        readonly List<MigrationDefinition> migrations = new List<MigrationDefinition>();
+        readonly Dictionary<Type, int> migrationTypes = new Dictionary<Type, int>();
+        readonly Dictionary<string, int> migrationNames = new Dictionary<string, int>();
+        readonly List<MigrationDefinition> roots = new List<MigrationDefinition>();
+        readonly Dictionary<MigrationDefinition, MigrationDefinition> parents = new Dictionary<MigrationDefinition, MigrationDefinition>();
+        readonly Dictionary<MigrationDefinition, List<MigrationDefinition>> childs = new Dictionary<MigrationDefinition, List<MigrationDefinition>>();
+        readonly Dictionary<MigrationDefinition, IMigrationHandler> handlers = new Dictionary<MigrationDefinition, IMigrationHandler>();
+
+        public MigrationStructure(IEnumerable<MigrationDefinition> migrationDefinitions)
+        {
+            foreach (var m in migrationDefinitions)
+            {
+                var index = migrations.Count;
+                migrations.Add(m);
+                migrationTypes.Add(m.HandlerType, index);
+                migrationNames.Add(m.Name.ToUpper(), index);
+
+                if (m.IsRoot)
+                    roots.Add(m);
+            }
+
+            foreach (var migration in migrations)
+            {
+                if (migration.IsRoot)
+                    continue;
+
+                if (!TryGetByHandlerType(migration.ParentHandlerType, out MigrationDefinition parentMigration))
                     throw new InvalidOperationException();
 
-                var migration = CreateMigrationInstance(migrationDefinition);
-                migrations.Add(migrationDefinition, migration);
-            }
+                parents.Add(migration, parentMigration);
 
-            var result = new List<IMigrationVersion>();
-            foreach (var kv in migrations)
+                if (!childs.TryGetValue(parentMigration, out List<MigrationDefinition> childMigrations))
+                    childs.Add(parentMigration, childMigrations = new List<MigrationDefinition>());
+
+                childMigrations.Add(migration);
+            }
+        }
+
+        public void Build(IServiceProvider serviceProvider)
+        {
+            foreach (var m in migrations)
             {
-                using (kv.Value)
-                {
-                    await kv.Value.Migration.DownAsync(cancellationToken);
-                    await migrationStore.CancelMigrationAsync(kv.Key);
-                }
-
-                result.Add(kv.Key);
+                var handler = CreateMigrationHandler(m, serviceProvider);
+                handlers.Add(m, handler);
             }
+        }
+
+        public async Task<List<IMigrationDefinition>> UpAsync(IMigrationState migrationState, CancellationToken cancellationToken)
+        {
+            var result = new List<IMigrationDefinition>();
+
+            foreach (var rootMigration in roots)
+                await UpMigrationAsync(result, migrationState, rootMigration, cancellationToken);
 
             return result;
         }
-
-        private MigrationWrapper CreateMigrationInstance(MigrationDefinition migrationDefinition)
+        private async Task UpMigrationAsync(List<IMigrationDefinition> upped, IMigrationState migrationState, MigrationDefinition migration, CancellationToken cancellationToken)
         {
-            var migrationType = migrationDefinition.MigrationType;
+            if (!handlers.TryGetValue(migration, out IMigrationHandler migrationHandler))
+                throw new InvalidOperationException();
+
+            if (!await migrationState.IsAppliedAsync(migration))
+            {
+                await migrationHandler.UpAsync(cancellationToken);
+
+                await migrationState.SetUpAsync(migration, CancellationToken.None);
+
+                upped.Add(migration);
+            }
+
+            if (childs.TryGetValue(migration, out List<MigrationDefinition> childrenMigrations))
+            {
+                foreach (var childMigration in childrenMigrations)
+                    await UpMigrationAsync(upped, migrationState, childMigration, cancellationToken);
+            }
+        }
+
+        public async Task<List<IMigrationDefinition>> DownAsync(IMigrationState migrationState, CancellationToken cancellationToken)
+        {
+            var result = new List<IMigrationDefinition>();
+
+            foreach (var rootMigration in roots)
+                await DownMigrationAsync(result, migrationState, rootMigration, cancellationToken);
+
+            return result;
+        }
+        private async Task DownMigrationAsync(List<IMigrationDefinition> downed, IMigrationState migrationState, MigrationDefinition migration, CancellationToken cancellationToken)
+        {
+            if (!handlers.TryGetValue(migration, out IMigrationHandler migrationHandler))
+                throw new InvalidOperationException();
+
+            if (childs.TryGetValue(migration, out List<MigrationDefinition> childrenMigrations))
+            {
+                foreach (var childMigration in childrenMigrations)
+                    await DownMigrationAsync(downed, migrationState, childMigration, cancellationToken);
+            }
+
+            if (await migrationState.IsAppliedAsync(migration))
+            {
+                await migrationHandler.DownAsync(cancellationToken);
+
+                await migrationState.SetDownAsync(migration, CancellationToken.None);
+
+                downed.Add(migration);
+            }
+        }
+
+        private bool TryGetByHandlerType(Type handlerType, out MigrationDefinition migrationDefinition)
+        {
+            if (!migrationTypes.TryGetValue(handlerType, out int index))
+            {
+                migrationDefinition = null;
+                return false;
+            }
+
+            migrationDefinition = migrations[index];
+            return true;
+        }
+        private bool TryGetByName(string name, out MigrationDefinition migrationDefinition)
+        {
+            if (name == null)
+                throw new ArgumentNullException("name");
+
+            if (!migrationNames.TryGetValue(name.ToUpper(), out int index))
+            {
+                migrationDefinition = null;
+                return false;
+            }
+
+            migrationDefinition = migrations[index];
+            return true;
+        }
+        private IMigrationHandler CreateMigrationHandler(MigrationDefinition migrationDefinition, IServiceProvider serviceProvider)
+        {
+            var migrationType = migrationDefinition.HandlerType;
             var migrationConstructor = migrationType.GetConstructors(BindingFlags.Instance | BindingFlags.Public).SingleOrDefault();
             if (migrationConstructor == null)
                 throw new InvalidOperationException();
 
-            var scope = serviceProvider.CreateScope();
             var constructorParamsInfo = migrationConstructor.GetParameters();
             var constratorParams = new object[constructorParamsInfo.Length];
             var i = 0;
             foreach (var p in constructorParamsInfo)
             {
-                constratorParams[i] = scope.ServiceProvider.GetService(p.ParameterType);
+                constratorParams[i] = serviceProvider.GetRequiredService(p.ParameterType);
                 i++;
             }
 
-            var migration = (IMigration)migrationConstructor.Invoke(constratorParams);
-
-            return new MigrationWrapper
-            {
-                Scope = scope,
-                Migration = migration
-            };
-        }
-
-        private class MigrationWrapper : IDisposable
-        {
-            public IMigration Migration { get; set; }
-            public IServiceScope Scope { get; set; }
-
-            void IDisposable.Dispose()
-            {
-                if (Migration is IDisposable d)
-                    d.Dispose();
-
-                Scope.Dispose();
-            }
+            return (IMigrationHandler)migrationConstructor.Invoke(constratorParams);
         }
     }
 }
