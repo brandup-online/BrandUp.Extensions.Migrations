@@ -1,14 +1,13 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>netstandard2.1</TargetFramework>
-    <RootNamespace>BrandUp.Extensions.Migrations</RootNamespace>
-    <LangVersion>7.1</LangVersion>
-    <Authors>Dmitry Kovyazin</Authors>
-    <Company>BrandUp.online</Company>
-    <Product>BrandUp.Extensions.Migrations</Product>
-    <RepositoryUrl>https://github.com/dkovyazin/BrandUp.Extensions.Migrations</RepositoryUrl>
-    <PackageProjectUrl>https://github.com/dkovyazin/BrandUp.Extensions.Migrations</PackageProjectUrl>
+	<TargetFramework>net7.0</TargetFramework>
+	<RootNamespace>BrandUp.Extensions.Migrations</RootNamespace>
+	<Authors>Dmitry Kovyazin</Authors>
+	<Company>BrandUp.online</Company>
+	<Product>BrandUp.Extensions.Migrations</Product>
+	<RepositoryUrl>https://github.com/dkovyazin/BrandUp.Extensions.Migrations</RepositoryUrl>
+	<PackageProjectUrl>https://github.com/dkovyazin/BrandUp.Extensions.Migrations</PackageProjectUrl>
   </PropertyGroup>
 
 </Project>
