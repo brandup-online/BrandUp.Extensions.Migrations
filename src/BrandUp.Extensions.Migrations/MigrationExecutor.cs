@@ -63,7 +63,7 @@ namespace BrandUp.Extensions.Migrations
             if (migrationDefinitions.Count == 0)
                 return null;
 
-            return new MigrationStructure(migrationDefinitions);
+            return new MigrationStructure(migrationDefinitions, logger);
         }
         void FindMigrations(HashSet<MigrationDefinition> migrationDefinitions, Assembly assembly, List<Assembly> assemblies)
         {
@@ -86,16 +86,19 @@ namespace BrandUp.Extensions.Migrations
 
     class MigrationStructure
     {
-        readonly List<MigrationDefinition> migrations = new List<MigrationDefinition>();
-        readonly Dictionary<Type, int> migrationTypes = new Dictionary<Type, int>();
-        readonly Dictionary<string, int> migrationNames = new Dictionary<string, int>();
-        readonly List<MigrationDefinition> roots = new List<MigrationDefinition>();
-        readonly Dictionary<MigrationDefinition, MigrationDefinition> parents = new Dictionary<MigrationDefinition, MigrationDefinition>();
-        readonly Dictionary<MigrationDefinition, List<MigrationDefinition>> childs = new Dictionary<MigrationDefinition, List<MigrationDefinition>>();
-        readonly Dictionary<MigrationDefinition, IMigrationHandler> handlers = new Dictionary<MigrationDefinition, IMigrationHandler>();
+        readonly List<MigrationDefinition> migrations = new();
+        readonly ILogger logger;
+        readonly Dictionary<Type, int> migrationTypes = new();
+        readonly Dictionary<string, int> migrationNames = new();
+        readonly List<MigrationDefinition> roots = new();
+        readonly Dictionary<MigrationDefinition, MigrationDefinition> parents = new();
+        readonly Dictionary<MigrationDefinition, List<MigrationDefinition>> childs = new();
+        readonly Dictionary<MigrationDefinition, IMigrationHandler> handlers = new();
 
-        public MigrationStructure(IEnumerable<MigrationDefinition> migrationDefinitions)
+        public MigrationStructure(IEnumerable<MigrationDefinition> migrationDefinitions, ILogger logger)
         {
+            this.logger = logger;
+
             foreach (var m in migrationDefinitions)
             {
                 var index = migrations.Count;
@@ -147,14 +150,22 @@ namespace BrandUp.Extensions.Migrations
             if (!handlers.TryGetValue(migration, out IMigrationHandler migrationHandler))
                 throw new InvalidOperationException();
 
+            var handlerName = GetHandlerLogName(migrationHandler);
+
             if (!await migrationState.IsAppliedAsync(migration, cancellationToken))
             {
+                logger.LogInformation($"{handlerName}: begin up");
+
                 await migrationHandler.UpAsync(cancellationToken);
 
                 await migrationState.SetUpAsync(migration, cancellationToken);
 
+                logger.LogInformation($"{handlerName}: finish up");
+
                 upped.Add(migration);
             }
+            else
+                logger.LogInformation($"{handlerName}: already up");
 
             if (childs.TryGetValue(migration, out List<MigrationDefinition> childrenMigrations))
             {
@@ -177,20 +188,28 @@ namespace BrandUp.Extensions.Migrations
             if (!handlers.TryGetValue(migration, out IMigrationHandler migrationHandler))
                 throw new InvalidOperationException();
 
+            var handlerName = GetHandlerLogName(migrationHandler);
+
             if (childs.TryGetValue(migration, out List<MigrationDefinition> childrenMigrations))
             {
                 foreach (var childMigration in childrenMigrations)
                     await DownMigrationAsync(downed, migrationState, childMigration, cancellationToken);
             }
 
-            if (await migrationState.IsAppliedAsync(migration))
+            if (await migrationState.IsAppliedAsync(migration, cancellationToken))
             {
+                logger.LogInformation($"{handlerName}: begin down");
+
                 await migrationHandler.DownAsync(cancellationToken);
 
-                await migrationState.SetDownAsync(migration, CancellationToken.None);
+                await migrationState.SetDownAsync(migration, cancellationToken);
+
+                logger.LogInformation($"{handlerName}: finish down");
 
                 downed.Add(migration);
             }
+            else
+                logger.LogInformation($"{handlerName}: already down");
         }
 
         bool TryGetByHandlerType(Type handlerType, out MigrationDefinition migrationDefinition)
@@ -235,6 +254,11 @@ namespace BrandUp.Extensions.Migrations
             }
 
             return (IMigrationHandler)migrationConstructor.Invoke(constratorParams);
+        }
+
+        static string GetHandlerLogName(IMigrationHandler migrationHandler)
+        {
+            return $"{migrationHandler.GetType().Assembly.FullName}, {migrationHandler.GetType().FullName}";
         }
     }
 }

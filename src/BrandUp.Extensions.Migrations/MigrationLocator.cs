@@ -6,6 +6,9 @@ namespace BrandUp.Extensions.Migrations
     {
         public IEnumerable<MigrationDefinition> FindMigrations(Assembly assembly)
         {
+            if (assembly == null)
+                throw new ArgumentNullException(nameof(assembly));
+
             var defs = new List<MigrationDefinition>();
             foreach (var type in assembly.GetTypes())
             {
