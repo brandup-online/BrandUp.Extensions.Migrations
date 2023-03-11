@@ -1,11 +1,10 @@
-﻿using System.Collections.Generic;
-using System.Reflection;
+﻿using System.Reflection;
 
 namespace BrandUp.Extensions.Migrations
 {
     public class MigrationOptions
     {
-        readonly HashSet<Assembly> assemblies = new HashSet<Assembly>();
+        readonly HashSet<Assembly> assemblies = new();
 
         public IEnumerable<Assembly> Assemblies => assemblies;
 

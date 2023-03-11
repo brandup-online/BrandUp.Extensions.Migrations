@@ -1,9 +1,5 @@
 using BrandUp.Extensions.Migrations.Tests.Migrations;
 using Microsoft.Extensions.DependencyInjection;
-using System;
-using System.Collections.Generic;
-using System.Threading;
-using System.Threading.Tasks;
 using Xunit;
 
 namespace BrandUp.Extensions.Migrations.Tests

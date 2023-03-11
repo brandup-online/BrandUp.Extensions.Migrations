@@ -1,6 +1,4 @@
-﻿using System;
-
-namespace BrandUp.Extensions.Migrations
+﻿namespace BrandUp.Extensions.Migrations
 {
     [AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = false)]
     public class UpgradeAttribute : MigrationAttribute

@@ -1,6 +1,4 @@
-﻿using System;
-
-namespace BrandUp.Extensions.Migrations
+﻿namespace BrandUp.Extensions.Migrations
 {
     public abstract class MigrationAttribute : Attribute
     {

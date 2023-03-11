@@ -1,5 +1,4 @@
 ﻿using BrandUp.Extensions.Migrations;
-using System;
 
 namespace Microsoft.Extensions.DependencyInjection
 {

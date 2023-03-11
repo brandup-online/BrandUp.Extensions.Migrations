@@ -1,5 +1,4 @@
 using BrandUp.Extensions.Migrations.Tests.Migrations;
-using System.Linq;
 using Xunit;
 
 namespace BrandUp.Extensions.Migrations.Tests

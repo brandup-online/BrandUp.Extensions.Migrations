@@ -1,7 +1,4 @@
-﻿using System.Threading;
-using System.Threading.Tasks;
-
-namespace BrandUp.Extensions.Migrations.Tests.Migrations
+﻿namespace BrandUp.Extensions.Migrations.Tests.Migrations
 {
     [Setup]
     public class Migration1 : IMigrationHandler
