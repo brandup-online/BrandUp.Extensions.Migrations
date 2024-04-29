@@ -5,22 +5,13 @@ using Microsoft.Extensions.Options;
 
 namespace BrandUp.Extensions.Migrations
 {
-    public class MigrationExecutor
+    public class MigrationExecutor(IOptions<MigrationOptions> options, IMigrationLocator migrationLocator, IMigrationState migrationState, ILogger<MigrationExecutor> logger, IServiceProvider serviceProvider)
     {
-        readonly MigrationOptions options;
-        readonly IMigrationLocator migrationLocator;
-        readonly IMigrationState migrationState;
-        readonly ILogger<MigrationExecutor> logger;
-        readonly IServiceProvider serviceProvider;
-
-        public MigrationExecutor(IOptions<MigrationOptions> options, IMigrationLocator migrationLocator, IMigrationState migrationState, ILogger<MigrationExecutor> logger, IServiceProvider serviceProvider)
-        {
-            this.options = options?.Value ?? throw new ArgumentNullException(nameof(options));
-            this.migrationLocator = migrationLocator ?? throw new ArgumentNullException(nameof(migrationLocator));
-            this.migrationState = migrationState ?? throw new ArgumentNullException(nameof(migrationState));
-            this.logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            this.serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
-        }
+        readonly MigrationOptions options = options?.Value ?? throw new ArgumentNullException(nameof(options));
+        readonly IMigrationLocator migrationLocator = migrationLocator ?? throw new ArgumentNullException(nameof(migrationLocator));
+        readonly IMigrationState migrationState = migrationState ?? throw new ArgumentNullException(nameof(migrationState));
+        readonly ILogger<MigrationExecutor> logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        readonly IServiceProvider serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
 
         public async Task<List<IMigrationDefinition>> UpAsync(CancellationToken cancellationToken = default)
         {
@@ -28,7 +19,7 @@ namespace BrandUp.Extensions.Migrations
             if (structure == null)
             {
                 logger.LogInformation($"Not found new migrations.");
-                return new List<IMigrationDefinition>();
+                return [];
             }
 
             using var scope = serviceProvider.CreateScope();
@@ -37,13 +28,14 @@ namespace BrandUp.Extensions.Migrations
 
             return await structure.UpAsync(migrationState, cancellationToken);
         }
+
         public async Task<List<IMigrationDefinition>> DownAsync(CancellationToken cancellationToken = default)
         {
             var structure = BuildStructure();
             if (structure == null)
             {
                 logger.LogInformation($"Not found new migrations.");
-                return new List<IMigrationDefinition>();
+                return [];
             }
 
             using var scope = serviceProvider.CreateScope();
@@ -65,6 +57,7 @@ namespace BrandUp.Extensions.Migrations
 
             return new MigrationStructure(migrationDefinitions, logger);
         }
+
         void FindMigrations(HashSet<MigrationDefinition> migrationDefinitions, Assembly assembly, List<Assembly> assemblies)
         {
             if (assemblies.Contains(assembly))
@@ -86,14 +79,14 @@ namespace BrandUp.Extensions.Migrations
 
     class MigrationStructure
     {
-        readonly List<MigrationDefinition> migrations = new();
+        readonly List<MigrationDefinition> migrations = [];
         readonly ILogger logger;
-        readonly Dictionary<Type, int> migrationTypes = new();
-        readonly Dictionary<string, int> migrationNames = new();
-        readonly List<MigrationDefinition> roots = new();
-        readonly Dictionary<MigrationDefinition, MigrationDefinition> parents = new();
-        readonly Dictionary<MigrationDefinition, List<MigrationDefinition>> childs = new();
-        readonly Dictionary<MigrationDefinition, IMigrationHandler> handlers = new();
+        readonly Dictionary<Type, int> migrationTypes = [];
+        readonly Dictionary<string, int> migrationNames = [];
+        readonly List<MigrationDefinition> roots = [];
+        readonly Dictionary<MigrationDefinition, MigrationDefinition> parents = [];
+        readonly Dictionary<MigrationDefinition, List<MigrationDefinition>> childs = [];
+        readonly Dictionary<MigrationDefinition, IMigrationHandler> handlers = [];
 
         public MigrationStructure(IEnumerable<MigrationDefinition> migrationDefinitions, ILogger logger)
         {
@@ -121,7 +114,7 @@ namespace BrandUp.Extensions.Migrations
                 parents.Add(migration, parentMigration);
 
                 if (!childs.TryGetValue(parentMigration, out List<MigrationDefinition> childMigrations))
-                    childs.Add(parentMigration, childMigrations = new List<MigrationDefinition>());
+                    childs.Add(parentMigration, childMigrations = []);
 
                 childMigrations.Add(migration);
             }
@@ -145,6 +138,7 @@ namespace BrandUp.Extensions.Migrations
 
             return result;
         }
+
         async Task UpMigrationAsync(List<IMigrationDefinition> upped, IMigrationState migrationState, MigrationDefinition migration, CancellationToken cancellationToken)
         {
             if (!handlers.TryGetValue(migration, out IMigrationHandler migrationHandler))
@@ -183,6 +177,7 @@ namespace BrandUp.Extensions.Migrations
 
             return result;
         }
+
         async Task DownMigrationAsync(List<IMigrationDefinition> downed, IMigrationState migrationState, MigrationDefinition migration, CancellationToken cancellationToken)
         {
             if (!handlers.TryGetValue(migration, out IMigrationHandler migrationHandler))
@@ -223,20 +218,7 @@ namespace BrandUp.Extensions.Migrations
             migrationDefinition = migrations[index];
             return true;
         }
-        bool TryGetByName(string name, out MigrationDefinition migrationDefinition)
-        {
-            if (name == null)
-                throw new ArgumentNullException("name");
 
-            if (!migrationNames.TryGetValue(name.ToUpper(), out int index))
-            {
-                migrationDefinition = null;
-                return false;
-            }
-
-            migrationDefinition = migrations[index];
-            return true;
-        }
         IMigrationHandler CreateMigrationHandler(MigrationDefinition migrationDefinition, IServiceProvider serviceProvider)
         {
             var migrationType = migrationDefinition.HandlerType;

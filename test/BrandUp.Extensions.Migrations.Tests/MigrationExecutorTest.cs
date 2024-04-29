@@ -6,9 +6,9 @@ namespace BrandUp.Extensions.Migrations.Tests
 {
     public class MigrationExecutorTest
     {
-        private readonly IServiceProvider provider;
-        private readonly IServiceScope scope;
-        private readonly MemoryMigrationStore store;
+        readonly IServiceProvider provider;
+        readonly IServiceScope scope;
+        readonly MemoryMigrationStore store;
 
         public MigrationExecutorTest()
         {
@@ -82,9 +82,9 @@ namespace BrandUp.Extensions.Migrations.Tests
             Assert.Empty(store.Names);
         }
 
-        private class MemoryMigrationStore : IMigrationState
+        class MemoryMigrationStore : IMigrationState
         {
-            readonly List<string> names = new List<string>();
+            readonly List<string> names = [];
 
             public List<string> Names => names;
 
