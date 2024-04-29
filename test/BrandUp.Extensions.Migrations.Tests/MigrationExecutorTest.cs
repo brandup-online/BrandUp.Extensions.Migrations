@@ -20,6 +20,12 @@ namespace BrandUp.Extensions.Migrations.Tests
             {
                 options.AddAssembly(typeof(Migration1).Assembly);
             });
+
+            services.ConfigureMigrations(options =>
+            {
+                options.AddAssembly(typeof(Migration1).Assembly);
+            });
+
             services.AddSingleton<IMigrationState>(store);
             services.AddScoped<TestService>();
 
