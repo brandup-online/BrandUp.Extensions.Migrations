@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
 		<TargetFramework>net8.0</TargetFramework>
@@ -7,6 +7,7 @@
 		<Product>BrandUp.Extensions.Migrations</Product>
 		<RepositoryUrl>https://github.com/brandup-online/BrandUp.Extensions.Migrations</RepositoryUrl>
 		<PackageProjectUrl>https://github.com/brandup-online/BrandUp.Extensions.Migrations</PackageProjectUrl>
+		<PackageIcon>icon.png</PackageIcon>
 		<ImplicitUsings>enable</ImplicitUsings>
 	</PropertyGroup>
 
