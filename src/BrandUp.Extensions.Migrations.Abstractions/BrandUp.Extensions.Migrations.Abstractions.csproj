@@ -1,14 +1,21 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <PropertyGroup>
-	<TargetFramework>net8.0</TargetFramework>
-	<RootNamespace>BrandUp.Extensions.Migrations</RootNamespace>
-	<Authors>Dmitry Kovyazin</Authors>
-	<Company>BrandUp.online</Company>
-	<Product>BrandUp.Extensions.Migrations</Product>
-	<RepositoryUrl>https://github.com/brandup-online/BrandUp.Extensions.Migrations</RepositoryUrl>
-	<PackageProjectUrl>https://github.com/brandup-online/BrandUp.Extensions.Migrations</PackageProjectUrl>
-	<ImplicitUsings>enable</ImplicitUsings>
-  </PropertyGroup>
-
+	<PropertyGroup>
+		<TargetFramework>net8.0</TargetFramework>
+		<RootNamespace>BrandUp.Extensions.Migrations</RootNamespace>
+		<Authors>Dmitry Kovyazin</Authors>
+		<Company>BrandUp.online</Company>
+		<Product>BrandUp.Extensions.Migrations</Product>
+		<RepositoryUrl>https://github.com/brandup-online/BrandUp.Extensions.Migrations</RepositoryUrl>
+		<PackageProjectUrl>https://github.com/brandup-online/BrandUp.Extensions.Migrations</PackageProjectUrl>
+		<ImplicitUsings>enable</ImplicitUsings>
+	</PropertyGroup>
+	
+	<ItemGroup>
+		<None Include="..\..\icon.png">
+			<Pack>True</Pack>
+			<PackagePath>\</PackagePath>
+		</None>
+	</ItemGroup>
+	
 </Project>

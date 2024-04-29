@@ -1,23 +1,30 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <PropertyGroup>
-	<TargetFramework>net8.0</TargetFramework>
-	<Authors>Dmitry Kovyazin</Authors>
-	<Company>BrandUp.online</Company>
-	<Product>BrandUp.Extensions.Migrations</Product>
-	<RepositoryUrl>https://github.com/brandup-online/BrandUp.Extensions.Migrations</RepositoryUrl>
-	<PackageProjectUrl>https://github.com/brandup-online/BrandUp.Extensions.Migrations</PackageProjectUrl>
-	<ImplicitUsings>enable</ImplicitUsings>
-  </PropertyGroup>
+	<PropertyGroup>
+		<TargetFramework>net8.0</TargetFramework>
+		<Authors>Dmitry Kovyazin</Authors>
+		<Company>BrandUp.online</Company>
+		<Product>BrandUp.Extensions.Migrations</Product>
+		<RepositoryUrl>https://github.com/brandup-online/BrandUp.Extensions.Migrations</RepositoryUrl>
+		<PackageProjectUrl>https://github.com/brandup-online/BrandUp.Extensions.Migrations</PackageProjectUrl>
+		<ImplicitUsings>enable</ImplicitUsings>
+	</PropertyGroup>
 
-  <ItemGroup>
-	<PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="8.0.1" />
-	<PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.1" />
-	<PackageReference Include="Microsoft.Extensions.Options" Version="8.0.2" />
-  </ItemGroup>
+	<ItemGroup>
+		<PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="8.0.1" />
+		<PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.1" />
+		<PackageReference Include="Microsoft.Extensions.Options" Version="8.0.2" />
+	</ItemGroup>
 
-  <ItemGroup>
-	<ProjectReference Include="..\BrandUp.Extensions.Migrations.Abstractions\BrandUp.Extensions.Migrations.Abstractions.csproj" />
-  </ItemGroup>
+	<ItemGroup>
+		<ProjectReference Include="..\BrandUp.Extensions.Migrations.Abstractions\BrandUp.Extensions.Migrations.Abstractions.csproj" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<None Include="..\..\icon.png">
+			<Pack>True</Pack>
+			<PackagePath>\</PackagePath>
+		</None>
+	</ItemGroup>
 
 </Project>
