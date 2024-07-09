@@ -1,11 +1,12 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio 15
-VisualStudioVersion = 15.0.28307.572
+# Visual Studio Version 17
+VisualStudioVersion = 17.10.35013.160
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{3AE09C67-DEDD-4DE1-8BC4-9F22705FB02F}"
 	ProjectSection(SolutionItems) = preProject
 		.gitignore = .gitignore
+		azure-pipelines.yml = azure-pipelines.yml
 		README.md = README.md
 	EndProjectSection
 EndProject
@@ -17,7 +18,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "test", "test", "{D9F3C59D-B
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BrandUp.Extensions.Migrations.Tests", "test\BrandUp.Extensions.Migrations.Tests\BrandUp.Extensions.Migrations.Tests.csproj", "{608CE99C-D8EC-4D95-BF99-BFF9AA1B1798}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BrandUp.Extensions.Migrations.Abstractions", "src\BrandUp.Extensions.Migrations.Abstractions\BrandUp.Extensions.Migrations.Abstractions.csproj", "{FA39A594-E90A-4E91-8E4C-605186E9DD67}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BrandUp.Extensions.Migrations.Abstractions", "src\BrandUp.Extensions.Migrations.Abstractions\BrandUp.Extensions.Migrations.Abstractions.csproj", "{FA39A594-E90A-4E91-8E4C-605186E9DD67}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
