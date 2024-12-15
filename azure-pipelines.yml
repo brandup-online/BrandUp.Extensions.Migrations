@@ -19,9 +19,9 @@ variables:
 - name: envName
   value: 'brandup-extensions-migrations'
 - name: version-major
-  value: "8"
+  value: "9"
 - name: version-minor
-  value: "1"
+  value: "0"
 
 name: $(version-major).$(version-minor).$(rev:r)
 
@@ -49,10 +49,10 @@ stages:
       persistCredentials: "true"
 
     - task: UseDotNet@2
-      displayName: 'use dotnet 8.x'
+      displayName: 'use dotnet 9.x'
       inputs:
         packageType: 'sdk'
-        version: '8.x'
+        version: '9.x'
         
     - task: DotNetCoreCLI@2
       displayName: 'dotnet restore'
