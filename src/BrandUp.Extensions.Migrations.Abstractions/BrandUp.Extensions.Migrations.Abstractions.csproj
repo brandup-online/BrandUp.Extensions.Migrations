@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
-		<TargetFramework>net9.0</TargetFramework>
+		<TargetFramework>net10.0</TargetFramework>
 		<RootNamespace>BrandUp.Extensions.Migrations</RootNamespace>
 		<Authors>Dmitry Kovyazin</Authors>
 		<Company>BrandUp.online</Company>
