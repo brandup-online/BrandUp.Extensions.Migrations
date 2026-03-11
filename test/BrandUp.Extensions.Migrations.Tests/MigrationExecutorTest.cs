@@ -38,7 +38,7 @@ namespace BrandUp.Extensions.Migrations.Tests
         {
             var executor = scope.ServiceProvider.GetService<MigrationExecutor>();
 
-            var appliedMigrations = await executor.UpAsync();
+            var appliedMigrations = await executor.UpAsync(TestContext.Current.CancellationToken);
 
             Assert.Equal(2, appliedMigrations.Count);
             Assert.Equal(2, store.Names.Count);
@@ -51,10 +51,10 @@ namespace BrandUp.Extensions.Migrations.Tests
         {
             var executor = scope.ServiceProvider.GetService<MigrationExecutor>();
 
-            var appliedMigrations = await executor.UpAsync();
+            var appliedMigrations = await executor.UpAsync(TestContext.Current.CancellationToken);
             Assert.Equal(2, appliedMigrations.Count);
 
-            appliedMigrations = await executor.UpAsync();
+            appliedMigrations = await executor.UpAsync(TestContext.Current.CancellationToken);
 
             Assert.Empty(appliedMigrations);
             Assert.Equal(2, store.Names.Count);
@@ -64,9 +64,9 @@ namespace BrandUp.Extensions.Migrations.Tests
         public async Task DownAsync_First()
         {
             var executor = scope.ServiceProvider.GetService<MigrationExecutor>();
-            await executor.UpAsync();
+            await executor.UpAsync(TestContext.Current.CancellationToken);
 
-            var downedMigrations = await executor.DownAsync();
+            var downedMigrations = await executor.DownAsync(TestContext.Current.CancellationToken);
 
             Assert.Equal(2, downedMigrations.Count);
             Assert.Empty(store.Names);
@@ -78,11 +78,11 @@ namespace BrandUp.Extensions.Migrations.Tests
         public async Task DownAsync_Second()
         {
             var executor = scope.ServiceProvider.GetService<MigrationExecutor>();
-            await executor.UpAsync();
-            var downedMigrations = await executor.DownAsync();
+            await executor.UpAsync(TestContext.Current.CancellationToken);
+            var downedMigrations = await executor.DownAsync(TestContext.Current.CancellationToken);
             Assert.Equal(2, downedMigrations.Count);
 
-            downedMigrations = await executor.DownAsync();
+            downedMigrations = await executor.DownAsync(TestContext.Current.CancellationToken);
 
             Assert.Empty(downedMigrations);
             Assert.Empty(store.Names);
