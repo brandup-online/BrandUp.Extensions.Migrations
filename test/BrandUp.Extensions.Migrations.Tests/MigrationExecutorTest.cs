@@ -34,6 +34,18 @@ namespace BrandUp.Extensions.Migrations.Tests
         }
 
         [Fact]
+        public async Task Resolves_IMigrationExecutor_Interface()
+        {
+            var executor = scope.ServiceProvider.GetService<IMigrationExecutor>();
+
+            Assert.NotNull(executor);
+
+            var appliedMigrations = await executor.UpAsync(TestContext.Current.CancellationToken);
+
+            Assert.Equal(2, appliedMigrations.Count);
+        }
+
+        [Fact]
         public async Task UpAsync_First()
         {
             var executor = scope.ServiceProvider.GetService<MigrationExecutor>();
@@ -96,19 +108,19 @@ namespace BrandUp.Extensions.Migrations.Tests
 
             public Task<bool> IsAppliedAsync(IMigrationDefinition migrationDefinition, CancellationToken cancellationToken = default)
             {
-                return Task.FromResult(names.Contains(migrationDefinition.Name.ToUpper()));
+                return Task.FromResult(names.Contains(migrationDefinition.Name.ToUpperInvariant()));
             }
 
             public Task SetUpAsync(IMigrationDefinition migrationDefinition, CancellationToken cancellationToken = default)
             {
-                names.Add(migrationDefinition.Name.ToUpper());
+                names.Add(migrationDefinition.Name.ToUpperInvariant());
 
                 return Task.CompletedTask;
             }
 
             public Task SetDownAsync(IMigrationDefinition migrationDefinition, CancellationToken cancellationToken = default)
             {
-                if (!names.Remove(migrationDefinition.Name.ToUpper()))
+                if (!names.Remove(migrationDefinition.Name.ToUpperInvariant()))
                     throw new InvalidOperationException();
 
                 return Task.CompletedTask;

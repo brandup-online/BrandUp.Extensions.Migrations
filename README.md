@@ -31,7 +31,7 @@ NuGet-package: [https://www.nuget.org/packages/BrandUp.Extensions.Migrations/](h
 [Setup]
 public class SetupMigration : IMigrationHandler
 {
-	readpnly IDbContext dbContext;
+	readonly IDbContext dbContext;
 
 	public SetupMigration(IDbContext dbContext)
 	{

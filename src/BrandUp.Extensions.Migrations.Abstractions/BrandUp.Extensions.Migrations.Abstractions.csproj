@@ -1,22 +1,9 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
 		<TargetFramework>net10.0</TargetFramework>
 		<RootNamespace>BrandUp.Extensions.Migrations</RootNamespace>
-		<Authors>Dmitry Kovyazin</Authors>
-		<Company>BrandUp.online</Company>
-		<Product>BrandUp.Extensions.Migrations</Product>
-		<RepositoryUrl>https://github.com/brandup-online/BrandUp.Extensions.Migrations</RepositoryUrl>
-		<PackageProjectUrl>https://github.com/brandup-online/BrandUp.Extensions.Migrations</PackageProjectUrl>
-		<PackageIcon>icon.png</PackageIcon>
-		<ImplicitUsings>enable</ImplicitUsings>
+		<Description>Abstractions (interfaces and attributes) for BrandUp.Extensions.Migrations: IMigrationHandler, IMigrationState, IMigrationExecutor and the Setup/Upgrade migration attributes.</Description>
 	</PropertyGroup>
-	
-	<ItemGroup>
-		<None Include="..\..\icon.png">
-			<Pack>True</Pack>
-			<PackagePath>\</PackagePath>
-		</None>
-	</ItemGroup>
-	
+
 </Project>

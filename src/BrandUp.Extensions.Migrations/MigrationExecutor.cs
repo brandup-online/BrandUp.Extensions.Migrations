@@ -1,56 +1,62 @@
-﻿using System.Reflection;
+using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace BrandUp.Extensions.Migrations
 {
-    public class MigrationExecutor(IOptions<MigrationOptions> options, IMigrationLocator migrationLocator, IMigrationState migrationState, ILogger<MigrationExecutor> logger, IServiceProvider serviceProvider)
+    /// <summary>
+    /// Discovers migrations in the configured assemblies and applies or reverts them in dependency order.
+    /// </summary>
+    /// <param name="options">Migration options describing which assemblies to scan.</param>
+    /// <param name="migrationLocator">Locator used to discover migrations within an assembly.</param>
+    /// <param name="logger">Logger.</param>
+    /// <param name="serviceProvider">Root service provider used to create a scope for each run.</param>
+    public class MigrationExecutor(IOptions<MigrationOptions> options, IMigrationLocator migrationLocator, ILogger<MigrationExecutor> logger, IServiceProvider serviceProvider) : IMigrationExecutor
     {
         readonly MigrationOptions options = options?.Value ?? throw new ArgumentNullException(nameof(options));
         readonly IMigrationLocator migrationLocator = migrationLocator ?? throw new ArgumentNullException(nameof(migrationLocator));
-        readonly IMigrationState migrationState = migrationState ?? throw new ArgumentNullException(nameof(migrationState));
         readonly ILogger<MigrationExecutor> logger = logger ?? throw new ArgumentNullException(nameof(logger));
         readonly IServiceProvider serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
 
+        /// <inheritdoc />
         public async Task<List<IMigrationDefinition>> UpAsync(CancellationToken cancellationToken = default)
         {
             var structure = BuildStructure();
             if (structure == null)
             {
-                logger.LogInformation($"Not found new migrations.");
+                logger.LogInformation("No migrations found.");
                 return [];
             }
 
             using var scope = serviceProvider.CreateScope();
+            var migrationState = scope.ServiceProvider.GetRequiredService<IMigrationState>();
 
-            structure.Build(scope.ServiceProvider);
-
-            return await structure.UpAsync(migrationState, cancellationToken);
+            return await structure.UpAsync(scope.ServiceProvider, migrationState, cancellationToken).ConfigureAwait(false);
         }
 
+        /// <inheritdoc />
         public async Task<List<IMigrationDefinition>> DownAsync(CancellationToken cancellationToken = default)
         {
             var structure = BuildStructure();
             if (structure == null)
             {
-                logger.LogInformation($"Not found new migrations.");
+                logger.LogInformation("No migrations found.");
                 return [];
             }
 
             using var scope = serviceProvider.CreateScope();
+            var migrationState = scope.ServiceProvider.GetRequiredService<IMigrationState>();
 
-            structure.Build(scope.ServiceProvider);
-
-            return await structure.DownAsync(migrationState, cancellationToken);
+            return await structure.DownAsync(scope.ServiceProvider, migrationState, cancellationToken).ConfigureAwait(false);
         }
 
-        MigrationStructure BuildStructure()
+        MigrationStructure? BuildStructure()
         {
             var migrationDefinitions = new HashSet<MigrationDefinition>();
-            var assemblies = new List<Assembly>();
+            var scannedAssemblies = new HashSet<Assembly>();
             foreach (var assembly in options.Assemblies)
-                FindMigrations(migrationDefinitions, assembly, assemblies);
+                FindMigrations(migrationDefinitions, assembly, scannedAssemblies);
 
             if (migrationDefinitions.Count == 0)
                 return null;
@@ -58,21 +64,18 @@ namespace BrandUp.Extensions.Migrations
             return new MigrationStructure(migrationDefinitions, logger);
         }
 
-        void FindMigrations(HashSet<MigrationDefinition> migrationDefinitions, Assembly assembly, List<Assembly> assemblies)
+        void FindMigrations(HashSet<MigrationDefinition> migrationDefinitions, Assembly assembly, HashSet<Assembly> scannedAssemblies)
         {
-            if (assemblies.Contains(assembly))
+            if (!scannedAssemblies.Add(assembly))
                 return;
-            assemblies.Add(assembly);
 
             foreach (var m in migrationLocator.FindMigrations(assembly))
             {
-                if (migrationDefinitions.Contains(m))
+                if (!migrationDefinitions.Add(m))
                     continue;
 
-                migrationDefinitions.Add(m);
-
-                if (!m.IsRoot && !assemblies.Contains(m.ParentHandlerType.Assembly))
-                    FindMigrations(migrationDefinitions, m.ParentHandlerType.Assembly, assemblies);
+                if (!m.IsRoot)
+                    FindMigrations(migrationDefinitions, m.ParentHandlerType!.Assembly, scannedAssemblies);
             }
         }
     }
@@ -81,12 +84,9 @@ namespace BrandUp.Extensions.Migrations
     {
         readonly List<MigrationDefinition> migrations = [];
         readonly ILogger logger;
-        readonly Dictionary<Type, int> migrationTypes = [];
-        readonly Dictionary<string, int> migrationNames = [];
+        readonly Dictionary<Type, MigrationDefinition> migrationsByType = [];
         readonly List<MigrationDefinition> roots = [];
-        readonly Dictionary<MigrationDefinition, MigrationDefinition> parents = [];
-        readonly Dictionary<MigrationDefinition, List<MigrationDefinition>> childs = [];
-        readonly Dictionary<MigrationDefinition, IMigrationHandler> handlers = [];
+        readonly Dictionary<MigrationDefinition, List<MigrationDefinition>> children = [];
 
         public MigrationStructure(IEnumerable<MigrationDefinition> migrationDefinitions, ILogger logger)
         {
@@ -94,10 +94,8 @@ namespace BrandUp.Extensions.Migrations
 
             foreach (var m in migrationDefinitions)
             {
-                var index = migrations.Count;
                 migrations.Add(m);
-                migrationTypes.Add(m.HandlerType, index);
-                migrationNames.Add(m.Name.ToUpper(), index);
+                migrationsByType.Add(m.HandlerType, m);
 
                 if (m.IsRoot)
                     roots.Add(m);
@@ -108,139 +106,144 @@ namespace BrandUp.Extensions.Migrations
                 if (migration.IsRoot)
                     continue;
 
-                if (!TryGetByHandlerType(migration.ParentHandlerType, out MigrationDefinition parentMigration))
-                    throw new InvalidOperationException();
+                if (!migrationsByType.TryGetValue(migration.ParentHandlerType!, out var parentMigration))
+                    throw new InvalidOperationException($"Migration \"{migration.Name}\" must be applied after \"{migration.ParentHandlerType}\", which is not a registered migration.");
 
-                parents.Add(migration, parentMigration);
-
-                if (!childs.TryGetValue(parentMigration, out List<MigrationDefinition> childMigrations))
-                    childs.Add(parentMigration, childMigrations = []);
+                if (!children.TryGetValue(parentMigration, out var childMigrations))
+                    children.Add(parentMigration, childMigrations = []);
 
                 childMigrations.Add(migration);
             }
+
+            roots.Sort(CompareByName);
+            foreach (var childList in children.Values)
+                childList.Sort(CompareByName);
+
+            EnsureReachable();
         }
 
-        public void Build(IServiceProvider serviceProvider)
-        {
-            foreach (var m in migrations)
-            {
-                var handler = CreateMigrationHandler(m, serviceProvider);
-                handlers.Add(m, handler);
-            }
-        }
-
-        public async Task<List<IMigrationDefinition>> UpAsync(IMigrationState migrationState, CancellationToken cancellationToken)
+        public async Task<List<IMigrationDefinition>> UpAsync(IServiceProvider serviceProvider, IMigrationState migrationState, CancellationToken cancellationToken)
         {
             var result = new List<IMigrationDefinition>();
 
             foreach (var rootMigration in roots)
-                await UpMigrationAsync(result, migrationState, rootMigration, cancellationToken);
+                await UpMigrationAsync(serviceProvider, result, migrationState, rootMigration, cancellationToken).ConfigureAwait(false);
 
             return result;
         }
 
-        async Task UpMigrationAsync(List<IMigrationDefinition> upped, IMigrationState migrationState, MigrationDefinition migration, CancellationToken cancellationToken)
+        async Task UpMigrationAsync(IServiceProvider serviceProvider, List<IMigrationDefinition> upped, IMigrationState migrationState, MigrationDefinition migration, CancellationToken cancellationToken)
         {
-            if (!handlers.TryGetValue(migration, out IMigrationHandler migrationHandler))
-                throw new InvalidOperationException();
+            var logName = GetMigrationLogName(migration);
 
-            var handlerName = GetHandlerLogName(migrationHandler);
-
-            if (!await migrationState.IsAppliedAsync(migration, cancellationToken))
+            if (!await migrationState.IsAppliedAsync(migration, cancellationToken).ConfigureAwait(false))
             {
-                logger.LogInformation($"{handlerName}: begin up");
+                logger.LogInformation("{Migration}: begin up", logName);
 
-                await migrationHandler.UpAsync(cancellationToken);
+                var migrationHandler = CreateMigrationHandler(migration, serviceProvider);
+                await migrationHandler.UpAsync(cancellationToken).ConfigureAwait(false);
 
-                await migrationState.SetUpAsync(migration, cancellationToken);
+                await migrationState.SetUpAsync(migration, cancellationToken).ConfigureAwait(false);
 
-                logger.LogInformation($"{handlerName}: finish up");
+                logger.LogInformation("{Migration}: finish up", logName);
 
                 upped.Add(migration);
             }
             else
-                logger.LogInformation($"{handlerName}: already up");
+                logger.LogInformation("{Migration}: already up", logName);
 
-            if (childs.TryGetValue(migration, out List<MigrationDefinition> childrenMigrations))
+            if (children.TryGetValue(migration, out var childrenMigrations))
             {
                 foreach (var childMigration in childrenMigrations)
-                    await UpMigrationAsync(upped, migrationState, childMigration, cancellationToken);
+                    await UpMigrationAsync(serviceProvider, upped, migrationState, childMigration, cancellationToken).ConfigureAwait(false);
             }
         }
 
-        public async Task<List<IMigrationDefinition>> DownAsync(IMigrationState migrationState, CancellationToken cancellationToken)
+        public async Task<List<IMigrationDefinition>> DownAsync(IServiceProvider serviceProvider, IMigrationState migrationState, CancellationToken cancellationToken)
         {
             var result = new List<IMigrationDefinition>();
 
             foreach (var rootMigration in roots)
-                await DownMigrationAsync(result, migrationState, rootMigration, cancellationToken);
+                await DownMigrationAsync(serviceProvider, result, migrationState, rootMigration, cancellationToken).ConfigureAwait(false);
 
             return result;
         }
 
-        async Task DownMigrationAsync(List<IMigrationDefinition> downed, IMigrationState migrationState, MigrationDefinition migration, CancellationToken cancellationToken)
+        async Task DownMigrationAsync(IServiceProvider serviceProvider, List<IMigrationDefinition> downed, IMigrationState migrationState, MigrationDefinition migration, CancellationToken cancellationToken)
         {
-            if (!handlers.TryGetValue(migration, out IMigrationHandler migrationHandler))
-                throw new InvalidOperationException();
-
-            var handlerName = GetHandlerLogName(migrationHandler);
-
-            if (childs.TryGetValue(migration, out List<MigrationDefinition> childrenMigrations))
+            if (children.TryGetValue(migration, out var childrenMigrations))
             {
                 foreach (var childMigration in childrenMigrations)
-                    await DownMigrationAsync(downed, migrationState, childMigration, cancellationToken);
+                    await DownMigrationAsync(serviceProvider, downed, migrationState, childMigration, cancellationToken).ConfigureAwait(false);
             }
 
-            if (await migrationState.IsAppliedAsync(migration, cancellationToken))
+            var logName = GetMigrationLogName(migration);
+
+            if (await migrationState.IsAppliedAsync(migration, cancellationToken).ConfigureAwait(false))
             {
-                logger.LogInformation($"{handlerName}: begin down");
+                logger.LogInformation("{Migration}: begin down", logName);
 
-                await migrationHandler.DownAsync(cancellationToken);
+                var migrationHandler = CreateMigrationHandler(migration, serviceProvider);
+                await migrationHandler.DownAsync(cancellationToken).ConfigureAwait(false);
 
-                await migrationState.SetDownAsync(migration, cancellationToken);
+                await migrationState.SetDownAsync(migration, cancellationToken).ConfigureAwait(false);
 
-                logger.LogInformation($"{handlerName}: finish down");
+                logger.LogInformation("{Migration}: finish down", logName);
 
                 downed.Add(migration);
             }
             else
-                logger.LogInformation($"{handlerName}: already down");
+                logger.LogInformation("{Migration}: already down", logName);
         }
 
-        bool TryGetByHandlerType(Type handlerType, out MigrationDefinition migrationDefinition)
+        void EnsureReachable()
         {
-            if (!migrationTypes.TryGetValue(handlerType, out int index))
+            var visited = new HashSet<MigrationDefinition>();
+            var stack = new Stack<MigrationDefinition>(roots);
+            while (stack.Count > 0)
             {
-                migrationDefinition = null;
-                return false;
+                var migration = stack.Pop();
+                if (!visited.Add(migration))
+                    continue;
+
+                if (children.TryGetValue(migration, out var childList))
+                {
+                    foreach (var child in childList)
+                        stack.Push(child);
+                }
             }
 
-            migrationDefinition = migrations[index];
-            return true;
+            if (visited.Count != migrations.Count)
+            {
+                var unreachable = migrations.Where(m => !visited.Contains(m)).Select(m => m.Name);
+                throw new InvalidOperationException($"Circular or unreachable migration dependencies detected: {string.Join(", ", unreachable)}.");
+            }
         }
 
-        IMigrationHandler CreateMigrationHandler(MigrationDefinition migrationDefinition, IServiceProvider serviceProvider)
+        static int CompareByName(MigrationDefinition x, MigrationDefinition y)
+        {
+            return string.CompareOrdinal(x.Name, y.Name);
+        }
+
+        static IMigrationHandler CreateMigrationHandler(MigrationDefinition migrationDefinition, IServiceProvider serviceProvider)
         {
             var migrationType = migrationDefinition.HandlerType;
-            var migrationConstructor = migrationType.GetConstructors(BindingFlags.Instance | BindingFlags.Public).SingleOrDefault();
-            if (migrationConstructor == null)
-                throw new InvalidOperationException();
+            var constructors = migrationType.GetConstructors(BindingFlags.Instance | BindingFlags.Public);
+            if (constructors.Length != 1)
+                throw new InvalidOperationException($"Migration handler \"{migrationType.FullName}\" must have exactly one public constructor, but {constructors.Length} were found.");
 
+            var migrationConstructor = constructors[0];
             var constructorParamsInfo = migrationConstructor.GetParameters();
-            var constratorParams = new object[constructorParamsInfo.Length];
-            var i = 0;
-            foreach (var p in constructorParamsInfo)
-            {
-                constratorParams[i] = serviceProvider.GetRequiredService(p.ParameterType);
-                i++;
-            }
+            var constructorParams = new object[constructorParamsInfo.Length];
+            for (var i = 0; i < constructorParamsInfo.Length; i++)
+                constructorParams[i] = serviceProvider.GetRequiredService(constructorParamsInfo[i].ParameterType);
 
-            return (IMigrationHandler)migrationConstructor.Invoke(constratorParams);
+            return (IMigrationHandler)migrationConstructor.Invoke(constructorParams);
         }
 
-        static string GetHandlerLogName(IMigrationHandler migrationHandler)
+        static string GetMigrationLogName(MigrationDefinition migration)
         {
-            return $"{migrationHandler.GetType().Assembly.FullName}, {migrationHandler.GetType().FullName}";
+            return $"{migration.HandlerType.Assembly.FullName}, {migration.HandlerType.FullName}";
         }
     }
 }

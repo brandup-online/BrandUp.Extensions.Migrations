@@ -1,14 +1,8 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
 		<TargetFramework>net10.0</TargetFramework>
-		<Authors>Dmitry Kovyazin</Authors>
-		<Company>BrandUp.online</Company>
-		<Product>BrandUp.Extensions.Migrations</Product>
-		<RepositoryUrl>https://github.com/brandup-online/BrandUp.Extensions.Migrations</RepositoryUrl>
-		<PackageProjectUrl>https://github.com/brandup-online/BrandUp.Extensions.Migrations</PackageProjectUrl>
-		<PackageIcon>icon.png</PackageIcon>
-		<ImplicitUsings>enable</ImplicitUsings>
+		<Description>Assembly migrations for .NET: discovers migration handlers across assemblies, orders them by dependency, resolves them from the DI container and tracks applied state through a pluggable store.</Description>
 	</PropertyGroup>
 
 	<ItemGroup>
@@ -19,13 +13,6 @@
 
 	<ItemGroup>
 		<ProjectReference Include="..\BrandUp.Extensions.Migrations.Abstractions\BrandUp.Extensions.Migrations.Abstractions.csproj" />
-	</ItemGroup>
-
-	<ItemGroup>
-		<None Include="..\..\icon.png">
-			<Pack>True</Pack>
-			<PackagePath>\</PackagePath>
-		</None>
 	</ItemGroup>
 
 </Project>
