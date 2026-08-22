@@ -12,6 +12,8 @@ variables:
   value: '**/*.csproj'
 - name: test-projects
   value: '**/*[Tt]ests/*.csproj'
+- name: testResultsDirectory
+  value: '$(Agent.TempDirectory)/TestResults'
 - name: buildPlatform
   value: 'Any CPU'
 - name: buildConfiguration
@@ -68,23 +70,42 @@ stages:
         projects: $(restore-projects)
         arguments: --configuration $(buildConfiguration) /p:Version=$(Build.BuildNumber)
 
+    # Tests run on Microsoft.Testing.Platform (see global.json), which writes its own trx/cobertura
+    # reports, so publishTestResults must stay off to keep the task from injecting VSTest options
+    # that the platform does not understand. --report-trx and --coverage come from the
+    # Microsoft.Testing extensions referenced by the test project.
     - task: DotNetCoreCLI@2
       displayName: 'dotnet test'
       inputs:
         command: test
         projects: $(test-projects)
-        arguments: --configuration $(buildConfiguration) --no-build --collect "Code coverage"
-        failTaskOnFailedTests: true
-        publishTestResults: true
-        testRunTitle: "solution tests"
+        arguments: >
+          --configuration $(buildConfiguration) --no-build --no-restore
+          --results-directory $(testResultsDirectory)
+          --report-trx
+          --coverage --coverage-output-format cobertura
+        publishTestResults: false
 
     - task: PublishTestResults@2
-      enabled: "false"
-      displayName: 'publish test/coverage results'
+      displayName: 'publish test results'
       condition: succeededOrFailed()
       inputs:
-        testRunner: VSTest
-        testResultsFiles: '$(Agent.TempDirectory)/**/*.trx'
+        testResultsFormat: VSTest
+        testResultsFiles: '*.trx'
+        searchFolder: $(testResultsDirectory)
+        testRunTitle: "solution tests"
+        mergeTestResults: true
+        failTaskOnFailedTests: true
+
+    # Only the top level: the same reports are duplicated under In/<machine>/, and a ** pattern would
+    # count every file twice.
+    - task: PublishCodeCoverageResults@2
+      displayName: 'publish code coverage'
+      condition: succeededOrFailed()
+      inputs:
+        summaryFileLocation: '$(testResultsDirectory)/*.cobertura.xml'
+        pathToSources: $(Build.SourcesDirectory)
+        failIfCoverageEmpty: true
         
     - task: DotNetCoreCLI@2
       displayName: "dotnet pack"
