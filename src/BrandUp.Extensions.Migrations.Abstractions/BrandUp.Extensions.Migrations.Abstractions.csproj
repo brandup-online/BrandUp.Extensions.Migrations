@@ -1,7 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
-		<TargetFramework>net10.0</TargetFramework>
 		<RootNamespace>BrandUp.Extensions.Migrations</RootNamespace>
 		<Description>Abstractions (interfaces and attributes) for BrandUp.Extensions.Migrations: IMigrationHandler, IMigrationState, IMigrationExecutor and the Setup/Upgrade migration attributes.</Description>
 	</PropertyGroup>
